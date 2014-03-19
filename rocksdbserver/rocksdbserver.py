@@ -1,13 +1,15 @@
+import os
 import uuid
 
+import msgpack
 import rocksdb
 from funcserver import RPCServer, BaseHandler
 
 def ensuretable(fn):
     def wfn(self, table, *args, **kwargs):
-        if not table not in self.tables:
+        if table not in self.tables:
             raise Exception('Table "%s" does not exist' % table)
-        return fn(self.tables[table], *args, **kwargs)
+        return fn(self, self.tables[table], *args, **kwargs)
     return wfn
 
 class Table(object):
@@ -26,6 +28,7 @@ class Table(object):
 
     def open(self):
         opts = self.define_options()
+        opts.create_if_missing = True
         return rocksdb.DB(self.data_dir, opts)
 
     def define_options(self):
@@ -35,7 +38,7 @@ class Table(object):
     def put(self, key, item, batch=None):
         db = batch or self.rdb
 
-        key = key or item.get('_id', None) or uuid.uuid1()
+        key = key or item.get('_id', None) or uuid.uuid1().hex
         item['_id'] = key
 
         value = msgpack.packb(item)
@@ -65,7 +68,7 @@ class Table(object):
 class RocksDBAPI(object):
     def __init__(self, data_dir):
         self.data_dir = data_dir
-        self.tables = {}
+        self.tables = self.define_tables()
 
     def define_tables(self):
         return {}
@@ -99,13 +102,14 @@ class RocksDBServer(RPCServer):
         # make data dir if not already present
         self.data_dir = os.path.abspath(self.args.data_dir)
         if not os.path.exists(self.data_dir):
-            os.path.makedirs(self.data_dir)
+            os.makedirs(self.data_dir)
 
     def prepare_api(self):
-        return RocksDBAPI(args.data_dir)
+        return RocksDBAPI(self.args.data_dir)
 
     def define_args(self, parser):
-        parser.add_argument('data-dir', type=str, help='Directory path where data is stored')
+        parser.add_argument('data_dir', type=str, metavar='data-dir',
+            help='Directory path where data is stored')
 
 if __name__ == '__main__':
     RocksDBServer().start()
