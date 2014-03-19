@@ -1,1 +1,2 @@
-from rocksdbserver import RocksDBServer, RocksDBAPI, Table, ensuretable
+from rocksdbserver import RocksDBServer, RocksDBClient, \
+                          RocksDBAPI, Table, ensuretable

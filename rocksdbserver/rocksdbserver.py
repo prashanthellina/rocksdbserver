@@ -3,7 +3,7 @@ import uuid
 
 import msgpack
 import rocksdb
-from funcserver import RPCServer, BaseHandler
+from funcserver import RPCServer, RPCClient, BaseHandler
 
 def ensuretable(fn):
     def wfn(self, table, *args, **kwargs):
@@ -110,6 +110,9 @@ class RocksDBServer(RPCServer):
     def define_args(self, parser):
         parser.add_argument('data_dir', type=str, metavar='data-dir',
             help='Directory path where data is stored')
+
+class RocksDBClient(RPCClient):
+    pass
 
 if __name__ == '__main__':
     RocksDBServer().start()

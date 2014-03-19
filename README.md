@@ -77,3 +77,36 @@ The argument /tmp/data points to the data directory where the db files are store
 Now visit http://locahost:8889 to use the web based console and try out the following
 
 ![Image](./simpledb.png?raw=true)
+
+The above exercise demonstrates how to interact with the database via a web based shell. Now let us try to interact with the database from a Pythons script using the client API.
+
+Consider this sample client code from examples/simple_db_client.py
+
+``` python
+from rocksdbserver import RocksDBClient
+
+if __name__ == '__main__':
+    db = RocksDBClient('http://localhost:8889')
+    print db.put('names', 'prashanth', {'last_name': 'ellina', 'days': 10})
+    key = db.put('names', None, {'last_name': 'doe', 'days': 12})
+    print key
+
+    print db.get('names', 'prashanth')
+    print db.get('names', key)
+```
+
+Run this by doing
+
+``` bash
+python examples/simple_db_client.py
+```
+
+The output will look something like this
+
+``` bash
+$ python simple_db_client.py 
+prashanth
+238b74b0af8d11e3bcd3d43d7e99b40b
+{'last_name': 'ellina', 'days': 10, '_id': 'prashanth'}
+{'last_name': 'doe', 'days': 12, '_id': '238b74b0af8d11e3bcd3d43d7e99b40b'}
+```
