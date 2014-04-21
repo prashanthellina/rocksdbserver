@@ -38,13 +38,16 @@ class Table(object):
         opts = rocksdb.Options()
         return opts
 
-    def put(self, key, item, batch=None, keyfn=lambda item: uuid.uuid1().hex):
+    def put(self, key, item, batch=None,
+        keyfn=lambda item: uuid.uuid1().hex,
+        packfn=lambda item: msgpack.packb):
+
         db = batch or self.rdb
 
         key = key or item.get('_id', None) or keyfn(item)
         item['_id'] = key
 
-        value = msgpack.packb(item)
+        value = packfn(item)
         db.put(key, value)
 
         return key
