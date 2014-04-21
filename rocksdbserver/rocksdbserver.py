@@ -31,6 +31,7 @@ def ensurenewiter(fn):
             raise Exception('iter "%s" exists already!' % name)
 
         return fn(*args, **kwargs)
+    return wfn
 
 class Iterator(object):
     NUM_RECORDS = 1000
