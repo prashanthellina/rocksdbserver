@@ -105,12 +105,20 @@ class RocksDBAPI(object):
         return table.get(key)
 
     @ensuretable
+    def delete(self, table, key):
+        return table.delete(key)
+
+    @ensuretable
     def put_many(self, table, data):
         return table.put_many(data)
 
     @ensuretable
     def get_many(self, table, keys):
         return table.get_many(keys)
+
+    @ensuretable
+    def delete_many(self, table, keys):
+        return table.delete_many(keys)
 
 class RocksDBServer(RPCServer):
     NAME = 'RocksDBServer'
