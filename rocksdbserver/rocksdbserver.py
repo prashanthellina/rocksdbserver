@@ -213,6 +213,30 @@ class RocksDBAPI(object):
     def delete_many(self, table, keys):
         return table.delete_many(keys)
 
+    @ensuretable
+    def iter_keys(self, table, prefix=None, name=None, reverse=False):
+        return table.iter_keys(prefix, name, reverse)
+
+    @ensuretable
+    def iter_values(self, table, prefix=None, name=None, reverse=False):
+        return table.iter_values(prefix, name, reverse)
+
+    @ensuretable
+    def iter_items(self, table, prefix=None, name=None, reverse=False):
+        return table.iter_items(prefix, name, reverse)
+
+    @ensuretable
+    def list_iters(self, table):
+        return table.list_iters()
+
+    @ensuretable
+    def close_iter(self, table, name):
+        return table.close_iter(name)
+
+    @ensuretable
+    def iter_get(self, table, num=Iterator.NUM_RECORDS):
+        return table.iter_get(num)
+
 class RocksDBServer(RPCServer):
     NAME = 'RocksDBServer'
     DESC = 'RocksDB Server'
