@@ -59,6 +59,10 @@ class Table(object):
         item = msgpack.unpackb(value)
         return item
 
+    def delete(self, key, batch=None):
+        db = batch or self.rdb
+        db.delete(key)
+
     def put_many(self, data):
         batch = rocksdb.WriteBatch()
         for key, item in data:
@@ -70,6 +74,12 @@ class Table(object):
         for key, value in data.iteritems():
             data[key] = None if value is None else msgpack.unpackb(value)
         return data
+
+    def delete_many(self, keys):
+        batch = rocksdb.WriteBatch()
+        for key in keys:
+            self.delete(key, batch=batch)
+        self.rdb.write(batch)
 
 class RocksDBAPI(object):
     def __init__(self, data_dir):
