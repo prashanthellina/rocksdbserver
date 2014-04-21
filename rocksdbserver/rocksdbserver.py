@@ -3,8 +3,8 @@ import uuid
 import resource
 import random
 import string
+from functools import wraps
 
-from decorator import decorator
 import msgpack
 import rocksdb
 from funcserver import RPCServer, RPCClient, BaseHandler
@@ -15,22 +15,30 @@ ALPHANUM = set(string.letters + string.digits)
 def gen_random_seq(length=10):
     return ''.join([random.choice(ALPHANUM) for i in xrange(length)])
 
-@decorator
 def ensuretable(fn):
+    @wraps(fn)
     def wfn(self, table, *args, **kwargs):
         if table not in self.tables:
             raise Exception('Table "%s" does not exist' % table)
         return fn(self, self.tables[table], *args, **kwargs)
     return wfn
 
-@decorator
+def ensureiter(fn):
+    @wraps(fn)
+    def wfn(self, _iter, *args, **kwargs):
+        if _iter not in self.iters:
+            raise Exception('Iter "%s" does not exist' % _iter)
+        return fn(self, self.iters[_iter], *args, **kwargs)
+    return wfn
+
 def ensurenewiter(fn):
+    @wraps(fn)
     def wfn(self, *args, **kwargs):
         name = kwargs['name'] or gen_random_seq()
         if name in self.iters:
             raise Exception('iter "%s" exists already!' % name)
 
-        return fn(*args, **kwargs)
+        return fn(self, *args, **kwargs)
     return wfn
 
 class Iterator(object):
@@ -73,13 +81,19 @@ class Iterator(object):
     def seek(self, key):
         self._iter.seek(key)
 
+    def seek_to_first(self):
+        return self._iter.seek_to_first()
+
+    def seek_to_last(self):
+        return self._iter.seek_to_last()
+
 class Table(object):
     NAME = 'noname'
     ITER = Iterator
 
-    KEYFN = lambda item: uuid.uuid1().hex
-    PACKFN = lambda item: msgpack.packb
-    UNPACKFN = lambda value: msgpack.unpackb
+    KEYFN = staticmethod(lambda item: uuid.uuid1().hex)
+    PACKFN = staticmethod(msgpack.packb)
+    UNPACKFN = staticmethod(msgpack.unpackb)
 
     def __init__(self, data_dir, db):
         self.data_dir = os.path.join(data_dir, self.NAME)
@@ -172,11 +186,24 @@ class Table(object):
     def list_iters(self):
         return self.iters.keys()
 
-    def close_iter(self, name):
-        del self.iters[name]
+    def close_iter(self, _iter):
+        del self.iters[_iter]
 
-    def iter_get(self, name, num=Iterator.NUM_RECORDS):
-        self.iters[name].get(num)
+    @ensureiter
+    def iter_get(self, _iter, num=Iterator.NUM_RECORDS):
+        return _iter.get(num)
+
+    @ensureiter
+    def iter_seek(self, _iter, key):
+        return _iter.seek(key)
+
+    @ensureiter
+    def iter_seek_to_first(self, _iter):
+        return _iter.seek_to_first()
+
+    @ensureiter
+    def iter_seek_to_last(self, _iter):
+        return _iter.seek_to_last()
 
 class RocksDBAPI(object):
     def __init__(self, data_dir):
@@ -215,15 +242,15 @@ class RocksDBAPI(object):
 
     @ensuretable
     def iter_keys(self, table, prefix=None, name=None, reverse=False):
-        return table.iter_keys(prefix, name, reverse)
+        return table.iter_keys(prefix=prefix, name=name, reverse=reverse)
 
     @ensuretable
     def iter_values(self, table, prefix=None, name=None, reverse=False):
-        return table.iter_values(prefix, name, reverse)
+        return table.iter_values(prefix=prefix, name=name, reverse=reverse)
 
     @ensuretable
     def iter_items(self, table, prefix=None, name=None, reverse=False):
-        return table.iter_items(prefix, name, reverse)
+        return table.iter_items(prefix=prefix, name=name, reverse=reverse)
 
     @ensuretable
     def list_iters(self, table):
@@ -236,6 +263,18 @@ class RocksDBAPI(object):
     @ensuretable
     def iter_get(self, table, num=Iterator.NUM_RECORDS):
         return table.iter_get(num)
+
+    @ensuretable
+    def iter_seek(self, table, name, key):
+        return table.iter_seek(name, key)
+
+    @ensuretable
+    def iter_seek_to_first(self, table, name):
+        return table.iter_seek_to_first(name)
+
+    @ensuretable
+    def iter_seek_to_last(self, table, name):
+        return table.iter_seek_to_last(name)
 
 class RocksDBServer(RPCServer):
     NAME = 'RocksDBServer'
