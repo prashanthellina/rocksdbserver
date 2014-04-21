@@ -1,6 +1,7 @@
 import os
 import uuid
 import resource
+import string
 
 from decorator import decorator
 import msgpack
@@ -8,6 +9,10 @@ import rocksdb
 from funcserver import RPCServer, RPCClient, BaseHandler
 
 MAX_OPEN_FILES = 500000
+ALPHANUM = set(string.letters + string.digits)
+
+def gen_random_seq(length=10):
+    return ''.join([random.choice(ALPHANUM) for i in xrange(length)])
 
 @decorator
 def ensuretable(fn):
@@ -17,13 +22,73 @@ def ensuretable(fn):
         return fn(self, self.tables[table], *args, **kwargs)
     return wfn
 
+@decorator
+def ensurenewiter(fn):
+    def wfn(self, *args, **kwargs):
+        name = kwargs['name'] or gen_random_seq()
+        if name in self.iters:
+            raise Exception('iter "%s" exists already!' % name)
+
+        return fn(*args, **kwargs)
+
+class Iterator(object):
+    NUM_RECORDS = 1000
+
+    def __init__(self, table, prefix=None, type='items', reverse=False):
+        '''
+        @type: str; can be items/keys/values
+        '''
+        self.table = table
+        self.type = type
+        self.prefix = prefix
+        self.reverse = reverse
+
+        iterfn = getattr(self.table.rdb,
+            {'keys': 'iterkeys', 'values': 'itervalues'}\
+            .get(type, 'iteritems'))
+
+        self._iter = iterfn(prefix=prefix)
+
+        if reverse:
+            self._iter = reversed(self._iter)
+
+    def get(self, num=NUM_RECORDS):
+        records = []
+
+        for record in self._iter:
+            if self.type == 'items':
+                key, item = record
+                item = self.table.unpackfn(item)
+                record = (key, item)
+            elif self.type == 'values':
+                record = self.table.unpackfn(record)
+
+            records.append(record)
+            if len(records) >= num: break
+
+        return records
+
+    def seek(self, key):
+        self._iter.seek(key)
+
 class Table(object):
     NAME = 'noname'
+    ITER = Iterator
+
+    KEYFN = lambda item: uuid.uuid1().hex
+    PACKFN = lambda item: msgpack.packb
+    UNPACKFN = lambda value: msgpack.unpackb
 
     def __init__(self, data_dir, db):
         self.data_dir = os.path.join(data_dir, self.NAME)
         self.rdb = self.open()
         self.db = db
+        self.iters = {}
+
+        self.keyfn = self.KEYFN
+        self.packfn = self.PACKFN
+        self.unpackfn = self.UNPACKFN
+        self.iter_klass = self.ITER
 
     def __str__(self):
         return '<Table: %s>' % self.NAME
@@ -41,8 +106,10 @@ class Table(object):
         return opts
 
     def put(self, key, item, batch=None,
-        keyfn=lambda item: uuid.uuid1().hex,
-        packfn=lambda item: msgpack.packb):
+            keyfn=None, packfn=None):
+
+        packfn = packfn or self.packfn
+        keyfn = keyfn or self.keyfn
 
         db = batch or self.rdb
 
@@ -54,8 +121,8 @@ class Table(object):
 
         return key
 
-    def get(self, key,
-        unpackfn=lambda value: msgpack.unpackb):
+    def get(self, key, unpackfn=None):
+        unpackfn = unpackfn or self.unpackfn
 
         value = self.rdb.get(key)
         if value is None: return None
@@ -84,6 +151,30 @@ class Table(object):
         for key in keys:
             self.delete(key, batch=batch)
         self.rdb.write(batch)
+
+    @ensurenewiter
+    def iter_keys(self, prefix=None, name=None, reverse=False):
+        self.iters[name] = self.iter_klass(self, prefix,
+            type='keys', reverse=reverse)
+
+    @ensurenewiter
+    def iter_values(self, prefix=None, name=None, reverse=False):
+        self.iters[name] = self.iter_klass(self, prefix,
+            type='values', reverse=reverse)
+
+    @ensurenewiter
+    def iter_items(self, prefix=None, name=None, reverse=False):
+        self.iters[name] = self.iter_klass(self, prefix,
+            type='items', reverse=reverse)
+
+    def list_iters(self):
+        return self.iters.keys()
+
+    def close_iter(self, name):
+        del self.iters[name]
+
+    def iter_get(self, name, num=Iterator.NUM_RECORDS):
+        self.iters[name].get(num)
 
 class RocksDBAPI(object):
     def __init__(self, data_dir):
