@@ -1,9 +1,12 @@
 import os
 import uuid
+import resource
 
 import msgpack
 import rocksdb
 from funcserver import RPCServer, RPCClient, BaseHandler
+
+MAX_OPEN_FILES = 500000
 
 def ensuretable(fn):
     def wfn(self, table, *args, **kwargs):
@@ -35,10 +38,10 @@ class Table(object):
         opts = rocksdb.Options()
         return opts
 
-    def put(self, key, item, batch=None):
+    def put(self, key, item, batch=None, keyfn=lambda item: uuid.uuid1().hex):
         db = batch or self.rdb
 
-        key = key or item.get('_id', None) or uuid.uuid1().hex
+        key = key or item.get('_id', None) or keyfn(item)
         item['_id'] = key
 
         value = msgpack.packb(item)
@@ -103,6 +106,18 @@ class RocksDBServer(RPCServer):
         self.data_dir = os.path.abspath(self.args.data_dir)
         if not os.path.exists(self.data_dir):
             os.makedirs(self.data_dir)
+
+    def set_file_limits(self):
+        try:
+            # ulimit -n unlimited
+            resource.setrlimit(resource.RLIMIT_NOFILE,
+                (MAX_OPEN_FILES, MAX_OPEN_FILES))
+        except ValueError:
+            self.log.warning('unable to increase num files limit. run as root?')
+
+    def pre_start(self):
+        super(RocksDBServer, self).pre_start()
+        self.set_file_limits()
 
     def prepare_api(self):
         return RocksDBAPI(self.args.data_dir)
