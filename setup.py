@@ -10,6 +10,7 @@ setup(
     url="https://github.com/prashanthellina/rocksdbserver",
     license='MIT License',
     install_requires=[
+        'decorator',
         'tornado',
         'msgpack-python',
     ],

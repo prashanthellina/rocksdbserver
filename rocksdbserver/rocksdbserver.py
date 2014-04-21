@@ -2,12 +2,14 @@ import os
 import uuid
 import resource
 
+from decorator import decorator
 import msgpack
 import rocksdb
 from funcserver import RPCServer, RPCClient, BaseHandler
 
 MAX_OPEN_FILES = 500000
 
+@decorator
 def ensuretable(fn):
     def wfn(self, table, *args, **kwargs):
         if table not in self.tables:
