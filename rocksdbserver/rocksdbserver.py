@@ -52,11 +52,13 @@ class Table(object):
 
         return key
 
-    def get(self, key):
+    def get(self, key,
+        unpackfn=lambda value: msgpack.unpackb):
+
         value = self.rdb.get(key)
         if value is None: return None
 
-        item = msgpack.unpackb(value)
+        item = unpackfn(value)
         return item
 
     def delete(self, key, batch=None):
