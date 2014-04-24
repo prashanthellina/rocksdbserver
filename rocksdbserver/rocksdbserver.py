@@ -10,7 +10,7 @@ import rocksdb
 from funcserver import RPCServer, RPCClient, BaseHandler
 
 MAX_OPEN_FILES = 500000
-ALPHANUM = set(string.letters + string.digits)
+ALPHANUM = string.letters + string.digits
 
 def gen_random_seq(length=10):
     return ''.join([random.choice(ALPHANUM) for i in xrange(length)])
@@ -112,6 +112,9 @@ class Table(object):
     def __unicode__(self):
         return str(self)
 
+    @property
+    def log(self): return self.db.log
+
     def open(self):
         opts = self.define_options()
         opts.create_if_missing = True
@@ -129,8 +132,11 @@ class Table(object):
 
         db = batch or self.rdb
 
-        key = key or item.get('_id', None) or keyfn(item)
-        item['_id'] = key
+        if isinstance(item, dict):
+            key = key or item.get('_id', None) or keyfn(item)
+            item['_id'] = key
+        else:
+            key = key or keyfn(item)
 
         value = packfn(item)
         db.put(key, value)
@@ -167,6 +173,16 @@ class Table(object):
         for key in keys:
             self.delete(key, batch=batch)
         self.rdb.write(batch)
+
+    def list_keys(self):
+        _iter = self.rdb.iterkeys()
+        _iter.seek_to_first()
+        return list(_iter)
+
+    def list_values(self):
+        _iter = self.rdb.itervalues()
+        _iter.seek_to_first()
+        return list(self.unpackfn(x) for x in _iter)
 
     @ensurenewiter
     def iter_keys(self, prefix=None, name=None, reverse=False):
@@ -261,8 +277,8 @@ class RocksDBAPI(object):
         return table.close_iter(name)
 
     @ensuretable
-    def iter_get(self, table, num=Iterator.NUM_RECORDS):
-        return table.iter_get(num)
+    def iter_get(self, table, name, num=Iterator.NUM_RECORDS):
+        return table.iter_get(name, num)
 
     @ensuretable
     def iter_seek(self, table, name, key):
@@ -275,6 +291,28 @@ class RocksDBAPI(object):
     @ensuretable
     def iter_seek_to_last(self, table, name):
         return table.iter_seek_to_last(name)
+
+    @ensuretable
+    def list_keys(self, table):
+        '''
+        Lists all the keys in the table. This is meant
+        to be used only during debugging in development
+        and never in production as it loads all the keys
+        in table into RAM which might cause memory load
+        issues for large tables.
+        '''
+        return table.list_keys()
+
+    @ensuretable
+    def list_values(self, table):
+        '''
+        Lists all the values in the table. This is meant
+        to be used only during debugging in development
+        and never in production as it loads all the values
+        in table into RAM which might cause memory load
+        issues for large tables.
+        '''
+        return table.list_values()
 
 class RocksDBServer(RPCServer):
     NAME = 'RocksDBServer'
