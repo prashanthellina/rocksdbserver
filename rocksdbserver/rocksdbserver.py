@@ -185,6 +185,20 @@ class Table(object):
             self.delete(key, batch=batch)
         self.rdb.write(batch)
 
+    def delete_all(self):
+        batch = rocksdb.WriteBatch()
+        _iter = self.rdb.iterkeys()
+        _iter.seek_to_first()
+
+        for index, key in enumerate(_iter):
+            self.delete(key, batch)
+
+            if index % 2 == 0:
+                self.rdb.write(batch)
+                time.sleep(0) # allow event loop to gain control
+
+        self.rdb.write(batch)
+
     def list_keys(self):
         _iter = self.rdb.iterkeys()
         _iter.seek_to_first()
@@ -269,6 +283,15 @@ class RocksDBAPI(object):
     @ensuretable
     def delete_many(self, table, keys):
         return table.delete_many(keys)
+
+    @ensuretable
+    def delete_all(self, table):
+        '''
+        Deletes all items from the table. Use with caution.
+        If the table is very large, this could take a significant
+        amount of time.
+        '''
+        return table.delete_all()
 
     @ensuretable
     def iter_keys(self, table, prefix=None, name=None, reverse=False):
