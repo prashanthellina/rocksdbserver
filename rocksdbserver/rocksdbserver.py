@@ -388,6 +388,9 @@ class RocksDBClient(RPCClient):
             else:
                 self.iter_seek_to_first(table, name)
 
+        else:
+            self.iter_seek(table, name, prefix)
+
         while 1:
             items = self.iter_get(table, name)
             if not items: break
@@ -395,7 +398,7 @@ class RocksDBClient(RPCClient):
             for item in items:
                 yield item
 
-        self.close_iter(name)
+        self.close_iter(table, name)
 
     def iterkeys(self, table, prefix=None, reverse=False):
         return self._iter(table, prefix, reverse, 'iter_keys')
