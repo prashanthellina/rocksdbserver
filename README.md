@@ -105,6 +105,17 @@ prashanth
 #### Deletion
 
 ```
+> api.delete('names', 'prashanth')
+> api.get('names', 'prashanth')
+
+# In case you need to delete multiple keys at once, do
+> api.delete('names', ['prashanth', '238b74b0af8d11e3bcd3d43d7e99b40b'])
+
+# Let us add some data back
+> api.put('names', None, {'last_name': 'ellina'})
+> api.put('names', None, {'last_name': 'ellina1'})
+> api.put('names', None, {'last_name': 'ellina2'})
+
 > help(api.delete_all)
 Help on method delete_all in module rocksdbserver.rocksdbserver:
  
@@ -206,3 +217,5 @@ list_values(self, table, *args, **kwargs) method of __main__.SimpleDBAPI instanc
 > api.tables['names'].iters
 {}
 ```
+
+The above exercise shows how to iterate over keys using `iter_keys` API method. You can use `iter_values` for iteration over values and `iter_items` for iterating over key-value item pairs. 
