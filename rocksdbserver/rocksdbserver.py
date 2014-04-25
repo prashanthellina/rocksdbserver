@@ -1,14 +1,20 @@
+from gevent import monkey; monkey.patch_all()
+
 import os
+import time
 import uuid
 import resource
 import random
 import string
 from functools import wraps
 
+import gevent
 import msgpack
 import rocksdb
 from funcserver import RPCServer, RPCClient, BaseHandler
 
+ITERATOR_EXPIRY_CHECK = 5 * 60 # 5 minutes
+ITERATOR_EXPIRE = 15 * 60 # 15 minutes
 MAX_OPEN_FILES = 500000
 ALPHANUM = string.letters + string.digits
 
@@ -28,13 +34,17 @@ def ensureiter(fn):
     def wfn(self, _iter, *args, **kwargs):
         if _iter not in self.iters:
             raise Exception('Iter "%s" does not exist' % _iter)
-        return fn(self, self.iters[_iter], *args, **kwargs)
+
+        _iter = self.iters[_iter]
+        _iter.ts_last_activity = time.time()
+        return fn(self, _iter, *args, **kwargs)
     return wfn
 
 def ensurenewiter(fn):
     @wraps(fn)
     def wfn(self, *args, **kwargs):
         name = kwargs['name'] or gen_random_seq()
+        kwargs['name'] = name
         if name in self.iters:
             raise Exception('iter "%s" exists already!' % name)
 
@@ -52,6 +62,7 @@ class Iterator(object):
         self.type = type
         self.prefix = prefix
         self.reverse = reverse
+        self.ts_last_activity = time.time()
 
         iterfn = getattr(self.table.rdb,
             {'keys': 'iterkeys', 'values': 'itervalues'}\
@@ -188,16 +199,19 @@ class Table(object):
     def iter_keys(self, prefix=None, name=None, reverse=False):
         self.iters[name] = self.iter_klass(self, prefix,
             type='keys', reverse=reverse)
+        return name
 
     @ensurenewiter
     def iter_values(self, prefix=None, name=None, reverse=False):
         self.iters[name] = self.iter_klass(self, prefix,
             type='values', reverse=reverse)
+        return name
 
     @ensurenewiter
     def iter_items(self, prefix=None, name=None, reverse=False):
         self.iters[name] = self.iter_klass(self, prefix,
             type='items', reverse=reverse)
+        return name
 
     def list_iters(self):
         return self.iters.keys()
@@ -334,9 +348,26 @@ class RocksDBServer(RPCServer):
         except ValueError:
             self.log.warning('unable to increase num files limit. run as root?')
 
+    def expire_iters(self):
+        while 1:
+            ts = time.time()
+            for table in self.api.tables.itervalues():
+                expired = []
+
+                for iter_name, _iter in table.iters.iteritems():
+                    if ts - _iter.ts_last_activity >= ITERATOR_EXPIRE:
+                        expired.append(iter_name)
+
+                for iter_name in expired:
+                    table.close_iter(iter_name)
+
+            time.sleep(ITERATOR_EXPIRY_CHECK)
+
     def pre_start(self):
         super(RocksDBServer, self).pre_start()
         self.set_file_limits()
+
+        self.thread_expire_iters = gevent.spawn(self.expire_iters)
 
     def prepare_api(self):
         return RocksDBAPI(self.args.data_dir)
@@ -346,7 +377,34 @@ class RocksDBServer(RPCServer):
             help='Directory path where data is stored')
 
 class RocksDBClient(RPCClient):
-    pass
+
+    def _iter(self, table, prefix, reverse, fn):
+        fn = getattr(self, fn)
+        name = fn(table, prefix=prefix, reverse=reverse)
+
+        if prefix is None:
+            if reverse:
+                self.iter_seek_to_last(table, name)
+            else:
+                self.iter_seek_to_first(table, name)
+
+        while 1:
+            items = self.iter_get(table, name)
+            if not items: break
+
+            for item in items:
+                yield item
+
+        self.close_iter(name)
+
+    def iterkeys(self, table, prefix=None, reverse=False):
+        return self._iter(table, prefix, reverse, 'iter_keys')
+
+    def itervalues(self, table, prefix=None, reverse=False):
+        return self._iter(table, prefix, reverse, 'iter_values')
+
+    def iteritems(self, table, prefix=None, reverse=False):
+        return self._iter(table, prefix, reverse, 'iter_items')
 
 if __name__ == '__main__':
     RocksDBServer().start()

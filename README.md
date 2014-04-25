@@ -28,12 +28,6 @@ $ sudo pip install cython (ensure cython version >=0.20)
 $ sudo pip install git+git://github.com/stephan-hof/pyrocksdb.git
 ```
 
-### Install FuncServer
-
-``` bash
-sudo pip install git+git://github.com/prashanthellina/funcserver.git
-```
-
 ### Install RocksDBServer
 
 ``` bash
