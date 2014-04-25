@@ -29,6 +29,8 @@ sudo pip install git+git://github.com/prashanthellina/rocksdbserver.git
 
 ## Usage
 
+### Basic Usage
+
 Consider this simple usage example from the examples/ directory.
 
 ``` python
@@ -96,4 +98,111 @@ prashanth
 238b74b0af8d11e3bcd3d43d7e99b40b
 {'last_name': 'ellina', 'days': 10, '_id': 'prashanth'}
 {'last_name': 'doe', 'days': 12, '_id': '238b74b0af8d11e3bcd3d43d7e99b40b'}
+```
+
+### More details on usage
+
+#### Deletion
+
+```
+> help(api.delete_all)
+Help on method delete_all in module rocksdbserver.rocksdbserver:
+ 
+delete_all(self, table, *args, **kwargs) method of __main__.SimpleDBAPI instance
+    Deletes all items from the table. Use with caution.
+    If the table is very large, this could take a significant
+    amount of time.
+
+> api.delete_all()
+```
+
+#### Iteration
+
+The below session in the web-based console demonstrates iteration. Just like the exercise above the very same API commands used in the web-based console can be utilized from a client proxy.
+
+``` python
+
+# Let us first create some records
+
+> api.put('names', None, {'city': 'London'})
+'cc38f17ccca311e3aec5d43d7e99b40b'
+ 
+> api.put('names', None, {'city': 'New York'})
+'d0541de0cca311e3aec5d43d7e99b40b'
+ 
+> api.put('names', None, {'city': 'Boston'})
+'d32f14c0cca311e3aec5d43d7e99b40b'
+ 
+> api.put('names', None, {'city': 'Frankfurt'})
+'d5ce57d6cca311e3aec5d43d7e99b40b'
+ 
+> api.put('names', None, {'city': 'Singapore'})
+'d88c8acecca311e3aec5d43d7e99b40b'
+
+> help(api.list_keys)
+Help on method list_keys in module rocksdbserver.rocksdbserver:
+ 
+list_keys(self, table, *args, **kwargs) method of __main__.SimpleDBAPI instance
+    Lists all the keys in the table. This is meant
+    to be used only during debugging in development
+    and never in production as it loads all the keys
+    in table into RAM which might cause memory load
+    issues for large tables.
+ 
+> api.list_keys('names')
+['cc38f17ccca311e3aec5d43d7e99b40b', 'd0541de0cca311e3aec5d43d7e99b40b', 'd32f14c0cca311e3aec5d43d7e99b40b', 'd5ce57d6cca311e3aec5d43d7e99b40b', 'd88c8acecca311e3aec5d43d7e99b40b']
+
+> help(api.list_values)
+Help on method list_values in module rocksdbserver.rocksdbserver:
+ 
+list_values(self, table, *args, **kwargs) method of __main__.SimpleDBAPI instance
+    Lists all the values in the table. This is meant
+    to be used only during debugging in development
+    and never in production as it loads all the values
+    in table into RAM which might cause memory load
+    issues for large tables.
+    
+> api.list_values('names')
+[{'city': 'London', '_id': 'cc38f17ccca311e3aec5d43d7e99b40b'}, {'city': 'New York', '_id': 'd0541de0cca311e3aec5d43d7e99b40b'}, {'city': 'Boston', '_id': 'd32f14c0cca311e3aec5d43d7e99b40b'}, {'city': 'Frankfurt', '_id': 'd5ce57d6cca311e3aec5d43d7e
+99b40b'}, {'city': 'Singapore', '_id': 'd88c8acecca311e3aec5d43d7e99b40b'}]
+
+# list_keys and list_values are for usage for testing and development. For production
+# usage the following is the way to perform iteration.
+
+> iterK = api.iter_keys('names')
+> iterK
+'NcYAzfks0z'
+ 
+# iterK is a string that represents our current iterator whose state is maintained on the server.
+ 
+> api.tables['names'].iters
+{'NcYAzfks0z': <rocksdbserver.rocksdbserver.Iterator object at 0x7f98a8a03550>}
+
+# Before beginning the iteration we need to set the cursor location by seeking.
+# Let us seek to the beginning.
+ 
+> api.iter_seek_to_first('names', iterK)
+
+# Ask the API to send us the first two keys
+> api.iter_get('names', iterK, num=2)
+['cc38f17ccca311e3aec5d43d7e99b40b', 'd0541de0cca311e3aec5d43d7e99b40b']
+ 
+# And two more
+> api.iter_get('names', iterK, num=2)
+['d32f14c0cca311e3aec5d43d7e99b40b', 'd5ce57d6cca311e3aec5d43d7e99b40b']
+
+# And the more (only one is left now)
+> api.iter_get('names', iterK)
+['d88c8acecca311e3aec5d43d7e99b40b']
+ 
+# There are no more keys left to iterate over.
+> api.iter_get('names', iterK)
+[]
+
+# Cleanup the iterator state on the server
+# The server will garbage collect eventually but it is a good
+# practice to perform this action explicitly.
+> api.close_iter('names', iterK)
+> api.tables['names'].iters
+{}
 ```
