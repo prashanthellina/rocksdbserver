@@ -104,7 +104,7 @@ prashanth
 
 #### Deletion
 
-```
+``` python
 > api.delete('names', 'prashanth')
 > api.get('names', 'prashanth')
 
