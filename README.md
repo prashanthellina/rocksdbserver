@@ -218,4 +218,38 @@ list_values(self, table, *args, **kwargs) method of __main__.SimpleDBAPI instanc
 {}
 ```
 
-The above exercise shows how to iterate over keys using `iter_keys` API method. You can use `iter_values` for iteration over values and `iter_items` for iterating over key-value item pairs. 
+The above exercise shows how to iterate over keys using `iter_keys` API method. You can use `iter_values` for iteration over values and `iter_items` for iterating over key-value item pairs.
+
+#### Client side iteration
+
+``` python
+# Let us first create some records
+
+> api.put('names', None, {'city': 'London'})
+'cc38f17ccca311e3aec5d43d7e99b40b'
+ 
+> api.put('names', None, {'city': 'New York'})
+'d0541de0cca311e3aec5d43d7e99b40b'
+ 
+> api.put('names', None, {'city': 'Boston'})
+'d32f14c0cca311e3aec5d43d7e99b40b'
+ 
+> api.put('names', None, {'city': 'Frankfurt'})
+'d5ce57d6cca311e3aec5d43d7e99b40b'
+ 
+> api.put('names', None, {'city': 'Singapore'})
+'d88c8acecca311e3aec5d43d7e99b40b'
+```
+
+Now consider this python script that demonstrates client side iteration.
+
+``` python
+from rocksdbserver import RocksDBClient
+
+if __name__ == '__main__':
+    db = RocksDBClient('http://localhost:8889')
+    for key in db.iterkeys('names'):
+        print key
+```
+
+You could do the same for values and item using `itervalues` and `iteritems` respectively. The client code uses `iter_keys`, `iter_values` and `iter_items` API methods internally.
