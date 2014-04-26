@@ -11,6 +11,7 @@ setup(
     license='MIT License',
     install_requires=[
         'cython >= 0.20',
+        'decorator',
         'gevent',
         'decorator',
         'tornado',

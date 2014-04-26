@@ -6,11 +6,11 @@ import uuid
 import resource
 import random
 import string
-from functools import wraps
 
 import gevent
 import msgpack
 import rocksdb
+from decorator import decorator
 from funcserver import RPCServer, RPCClient, BaseHandler
 
 ITERATOR_EXPIRY_CHECK = 5 * 60 # 5 minutes
@@ -21,35 +21,29 @@ ALPHANUM = string.letters + string.digits
 def gen_random_seq(length=10):
     return ''.join([random.choice(ALPHANUM) for i in xrange(length)])
 
-def ensuretable(fn):
-    @wraps(fn)
-    def wfn(self, table, *args, **kwargs):
-        if table not in self.tables:
-            raise Exception('Table "%s" does not exist' % table)
-        return fn(self, self.tables[table], *args, **kwargs)
-    return wfn
+@decorator
+def ensuretable(fn, self, table, *args, **kwargs):
+    if table not in self.tables:
+        raise Exception('Table "%s" does not exist' % table)
+    return fn(self, self.tables[table], *args, **kwargs)
 
-def ensureiter(fn):
-    @wraps(fn)
-    def wfn(self, _iter, *args, **kwargs):
-        if _iter not in self.iters:
-            raise Exception('Iter "%s" does not exist' % _iter)
+@decorator
+def ensureiter(fn, self, _iter, *args, **kwargs):
+    if _iter not in self.iters:
+        raise Exception('Iter "%s" does not exist' % _iter)
 
-        _iter = self.iters[_iter]
-        _iter.ts_last_activity = time.time()
-        return fn(self, _iter, *args, **kwargs)
-    return wfn
+    _iter = self.iters[_iter]
+    _iter.ts_last_activity = time.time()
+    return fn(self, _iter, *args, **kwargs)
 
-def ensurenewiter(fn):
-    @wraps(fn)
-    def wfn(self, *args, **kwargs):
-        name = kwargs['name'] or gen_random_seq()
-        kwargs['name'] = name
-        if name in self.iters:
-            raise Exception('iter "%s" exists already!' % name)
+@decorator
+def ensurenewiter(fn, self, *args, **kwargs):
+    name = kwargs['name'] or gen_random_seq()
+    kwargs['name'] = name
+    if name in self.iters:
+        raise Exception('iter "%s" exists already!' % name)
 
-        return fn(self, *args, **kwargs)
-    return wfn
+    return fn(self, *args, **kwargs)
 
 class Iterator(object):
     NUM_RECORDS = 1000
