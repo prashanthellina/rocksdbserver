@@ -16,7 +16,7 @@ $ git clone https://github.com/facebook/rocksdb.git
 $ cd rocksdb
 $ # It is tested with this version
 $ git checkout 2.8.fb
-$ make librocksdb.so
+$ make shared_lib
 $ sudo mv librocksdb.so /usr/lib/
 $ sudo mv include/* /usr/include/
 ```
