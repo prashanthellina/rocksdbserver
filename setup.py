@@ -20,7 +20,7 @@ setup(
         'pyrocksdb',
     ],
     dependency_links=[
-        'http://github.com/prashanthellina/funcserver/tarball/master#egg=funcserver',
+        'https://github.com/prashanthellina/funcserver/archive/master.zip#egg=funcserver',
         'http://github.com/stephan-hof/pyrocksdb/archive/v0.2.tar.gz#egg=pyrocksdb'
     ],
     package_dir={'rocksdbserver': 'rocksdbserver'},
