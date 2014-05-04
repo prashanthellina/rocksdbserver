@@ -6,6 +6,7 @@ import uuid
 import resource
 import random
 import string
+from inspect import getcallargs
 
 import gevent
 import msgpack
@@ -38,8 +39,10 @@ def ensureiter(fn, self, _iter, *args, **kwargs):
 
 @decorator
 def ensurenewiter(fn, self, *args, **kwargs):
-    name = kwargs['name'] or gen_random_seq()
-    kwargs['name'] = name
+    name = getcallargs(fn, 'name') or gen_random_seq()
+    if args: args = list(args); args[0] = name
+    else: kwargs['name'] = name
+
     if name in self.iters:
         raise Exception('iter "%s" exists already!' % name)
 
@@ -204,19 +207,19 @@ class Table(object):
         return list(self.unpackfn(x) for x in _iter)
 
     @ensurenewiter
-    def iter_keys(self, prefix=None, name=None, reverse=False):
+    def iter_keys(self, name=None, prefix=None, reverse=False):
         self.iters[name] = self.iter_klass(self, prefix,
             type='keys', reverse=reverse)
         return name
 
     @ensurenewiter
-    def iter_values(self, prefix=None, name=None, reverse=False):
+    def iter_values(self, name=None, prefix=None, reverse=False):
         self.iters[name] = self.iter_klass(self, prefix,
             type='values', reverse=reverse)
         return name
 
     @ensurenewiter
-    def iter_items(self, prefix=None, name=None, reverse=False):
+    def iter_items(self, name=None, prefix=None, reverse=False):
         self.iters[name] = self.iter_klass(self, prefix,
             type='items', reverse=reverse)
         return name
@@ -288,16 +291,16 @@ class RocksDBAPI(object):
         return table.delete_all()
 
     @ensuretable
-    def iter_keys(self, table, prefix=None, name=None, reverse=False):
-        return table.iter_keys(prefix=prefix, name=name, reverse=reverse)
+    def iter_keys(self, table, name=None, prefix=None, reverse=False):
+        return table.iter_keys(name=name, prefix=prefix, reverse=reverse)
 
     @ensuretable
-    def iter_values(self, table, prefix=None, name=None, reverse=False):
-        return table.iter_values(prefix=prefix, name=name, reverse=reverse)
+    def iter_values(self, table, name=None, prefix=None, reverse=False):
+        return table.iter_values(name=name, prefix=prefix, reverse=reverse)
 
     @ensuretable
-    def iter_items(self, table, prefix=None, name=None, reverse=False):
-        return table.iter_items(prefix=prefix, name=name, reverse=reverse)
+    def iter_items(self, table, name=None, prefix=None, reverse=False):
+        return table.iter_items(name=name, prefix=prefix, reverse=reverse)
 
     @ensuretable
     def list_iters(self, table):
