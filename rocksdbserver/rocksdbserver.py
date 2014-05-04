@@ -39,7 +39,7 @@ def ensureiter(fn, self, _iter, *args, **kwargs):
 
 @decorator
 def ensurenewiter(fn, self, *args, **kwargs):
-    name = getcallargs(fn, 'name') or gen_random_seq()
+    name = getcallargs(fn, *args, **kwargs)['name'] or gen_random_seq()
     if args: args = list(args); args[0] = name
     else: kwargs['name'] = name
 
