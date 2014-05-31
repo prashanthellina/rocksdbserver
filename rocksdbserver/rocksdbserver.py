@@ -6,6 +6,7 @@ import uuid
 import resource
 import random
 import string
+import shutil
 from inspect import getcallargs
 
 import gevent
@@ -128,10 +129,9 @@ class Table(object):
         opts.create_if_missing = True
         return rocksdb.DB(self.data_dir, opts)
 
-    def reopen(self):
+    def close(self):
         self.iters = {}
         del self.rdb
-        self.rdb = self.open()
 
     def define_options(self):
         opts = rocksdb.Options()
@@ -187,20 +187,10 @@ class Table(object):
             self.delete(key, batch=batch)
         self.rdb.write(batch)
 
-    def delete_all(self, allow_coop=True):
-        batch = rocksdb.WriteBatch()
-        _iter = self.rdb.iterkeys()
-        _iter.seek_to_first()
-
-        for index, key in enumerate(_iter):
-            self.delete(key, batch)
-
-            if index % 1000 == 0:
-                self.rdb.write(batch)
-                if not allow_coop: continue
-                time.sleep(0) # allow event loop to gain control
-
-        self.rdb.write(batch)
+    def delete_all(self):
+        self.close()
+        shutil.rmtree(self.data_dir)
+        self.rdb = self.open()
 
     def count(self):
         _iter = self.rdb.iterkeys()
@@ -285,14 +275,16 @@ class Table(object):
 
     def restore_latest_backup(self, path):
         backup = rocksdb.BackupEngine(path)
+        self.close()
         r = backup.restore_latest_backup(self.data_dir, self.data_dir)
-        self.reopen()
+        self.rdb = self.open()
         return r
 
     def purge_old_backups(self, path, num_backups_to_keep):
         backup = rocksdb.BackupEngine(path)
+        self.close()
         r = backup.purge_old_backups(num_backups_to_keep)
-        self.reopen()
+        self.rdb = self.open()
         return r
 
 class RocksDBAPI(object):
