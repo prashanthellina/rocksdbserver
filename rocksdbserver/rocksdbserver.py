@@ -128,6 +128,11 @@ class Table(object):
         opts.create_if_missing = True
         return rocksdb.DB(self.data_dir, opts)
 
+    def reopen(self):
+        self.iters = {}
+        del self.rdb
+        self.rdb = self.open()
+
     def define_options(self):
         opts = rocksdb.Options()
         return opts
@@ -182,7 +187,7 @@ class Table(object):
             self.delete(key, batch=batch)
         self.rdb.write(batch)
 
-    def delete_all(self):
+    def delete_all(self, allow_coop=True):
         batch = rocksdb.WriteBatch()
         _iter = self.rdb.iterkeys()
         _iter.seek_to_first()
@@ -190,8 +195,9 @@ class Table(object):
         for index, key in enumerate(_iter):
             self.delete(key, batch)
 
-            if index % 2 == 0:
+            if index % 1000 == 0:
                 self.rdb.write(batch)
+                if not allow_coop: continue
                 time.sleep(0) # allow event loop to gain control
 
         self.rdb.write(batch)
@@ -199,6 +205,7 @@ class Table(object):
     def count(self):
         _iter = self.rdb.iterkeys()
         _iter.seek_to_first()
+        index = -1
         for index, k in enumerate(_iter): pass
         return index + 1
 
@@ -272,19 +279,21 @@ class Table(object):
         backup = rocksdb.BackupEngine(path)
         return backup.get_backup_info()
 
-    def restore_backup(self, path, backup_id, db_dir, wal_dir=None):
+    def restore_backup(self, path, backup_id):
         backup = rocksdb.BackupEngine(path)
-        return backup.restore_backup(backup_id, db_dir,
-            wal_dir if wal_dir is not None else db_dir)
+        return backup.restore_backup(backup_id, self.data_dir, self.data_dir)
 
-    def restore_latest_backup(self, path, db_dir, wal_dir=None):
+    def restore_latest_backup(self, path):
         backup = rocksdb.BackupEngine(path)
-        return backup.restore_latest_backup(db_dir,
-            wal_dir if wal_dir is not None else db_dir)
+        r = backup.restore_latest_backup(self.data_dir, self.data_dir)
+        self.reopen()
+        return r
 
     def purge_old_backups(self, path, num_backups_to_keep):
         backup = rocksdb.BackupEngine(path)
-        return backup.purge_old_backups(num_backups_to_keep)
+        r = backup.purge_old_backups(num_backups_to_keep)
+        self.reopen()
+        return r
 
 class RocksDBAPI(object):
     def __init__(self, data_dir):
@@ -322,13 +331,13 @@ class RocksDBAPI(object):
         return table.delete_many(keys)
 
     @ensuretable
-    def delete_all(self, table):
+    def delete_all(self, table, allow_coop=True):
         '''
         Deletes all items from the table. Use with caution.
         If the table is very large, this could take a significant
         amount of time.
         '''
-        return table.delete_all()
+        return table.delete_all(allow_coop)
 
     @ensuretable
     def count(self, table):
@@ -416,12 +425,12 @@ class RocksDBAPI(object):
         return table.get_backup_info(path)
 
     @ensuretable
-    def restore_backup(self, table, path, backup_id, db_dir, wal_dir=None):
-        return table.restore_backup(path, backup_id, db_dir, wal_dir)
+    def restore_backup(self, table, path, backup_id):
+        return table.restore_backup(path, backup_id)
 
     @ensuretable
-    def restore_latest_backup(self, table, path, db_dir, wal_dir=None):
-        return table.restore_latest_backup(path, db_dir, wal_dir)
+    def restore_latest_backup(self, table, path):
+        return table.restore_latest_backup(path)
 
     @ensuretable
     def purge_old_backups(self, table, path, num_backups_to_keep):
