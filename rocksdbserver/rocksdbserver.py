@@ -20,14 +20,55 @@ ITERATOR_EXPIRE = 15 * 60 # 15 minutes
 MAX_OPEN_FILES = 500000
 ALPHANUM = string.letters + string.digits
 
+class AttrDict(dict):
+    '''
+    A dictionary with attribute-style access. It maps attribute access to
+    the real dictionary.
+
+    # from: http://code.activestate.com/recipes/473786-dictionary-with-attribute-style-access/
+    '''
+
+    def __init__(self, init={}):
+        dict.__init__(self, init)
+
+    def __getstate__(self):
+        return self.__dict__.items()
+
+    def __setstate__(self, items):
+        for key, val in items:
+            self.__dict__[key] = val
+
+    def __repr__(self):
+        return "%s(%s)" % (self.__class__.__name__, dict.__repr__(self))
+
+    def __setitem__(self, key, value):
+        return super(AttrDict, self).__setitem__(key, value)
+
+    def __getitem__(self, name):
+        item = super(AttrDict, self).__getitem__(name)
+        return AttrDict(item) if isinstance(item, dict) else item
+
+    def __delitem__(self, name):
+        return super(AttrDict, self).__delitem__(name)
+
+    __getattr__ = __getitem__
+    __setattr__ = __setitem__
+
+    def copy(self):
+        ch = AttrDict(self)
+        return ch
+
+
 def gen_random_seq(length=10):
     return ''.join([random.choice(ALPHANUM) for i in xrange(length)])
+
 
 @decorator
 def ensuretable(fn, self, table, *args, **kwargs):
     if table not in self.tables:
         raise Exception('Table "%s" does not exist' % table)
     return fn(self, self.tables[table], *args, **kwargs)
+
 
 @decorator
 def ensureiter(fn, self, _iter, *args, **kwargs):
@@ -37,6 +78,7 @@ def ensureiter(fn, self, _iter, *args, **kwargs):
     _iter = self.iters[_iter]
     _iter.ts_last_activity = time.time()
     return fn(self, _iter, *args, **kwargs)
+
 
 @decorator
 def ensurenewiter(fn, self, *args, **kwargs):
@@ -48,6 +90,7 @@ def ensurenewiter(fn, self, *args, **kwargs):
         raise Exception('iter "%s" exists already!' % name)
 
     return fn(self, *args, **kwargs)
+
 
 class Iterator(object):
     NUM_RECORDS = 1000
@@ -95,6 +138,7 @@ class Iterator(object):
 
     def seek_to_last(self):
         return self._iter.seek_to_last()
+
 
 class Table(object):
     NAME = 'noname'
@@ -287,6 +331,37 @@ class Table(object):
         self.rdb = self.open()
         return r
 
+    def dump(self, path, fmt=None, allow_coop=True):
+        '''
+        Dumps all table data into a file located at @path.
+        @fmt (str): If specified (eg: "%(_id)s => %(url)s"),
+            converts the record into a string based on the
+            given format string.
+
+            else, dumps the raw record as stored in table.
+        @allow_coop (bool): if True, yields control
+            every N iterations to allow for co-operative
+            multi-tasking to work.
+        '''
+        f = open(path, 'wb')
+        _iter = self.rdb.itervalues()
+        _iter.seek_to_first()
+
+        for index, v in enumerate(_iter):
+
+            if fmt:
+                r = self.unpackfn(v)
+                for k, v in r.iteritems():
+                    r[k] = AttrDict(v) if isinstance(v, dict) else v
+                    f.write('%s\n' % (fmt % r))
+            else:
+                f.write(v)
+
+            if allow_coop and index % 100000 == 0: time.sleep(0)
+
+        f.close()
+
+
 class RocksDBAPI(object):
     def __init__(self, data_dir):
         self.data_dir = data_dir
@@ -427,6 +502,10 @@ class RocksDBAPI(object):
     @ensuretable
     def purge_old_backups(self, table, path, num_backups_to_keep):
         return table.purge_old_backups(path, num_backups_to_keep)
+
+    @ensuretable
+    def dump(self, table, path, fmt=None, allow_coop=True):
+        return table.dump(path, fmt, allow_coop)
 
 class RocksDBServer(RPCServer):
     NAME = 'RocksDBServer'
