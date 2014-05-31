@@ -347,6 +347,7 @@ class Table(object):
         _iter = self.rdb.itervalues()
         _iter.seek_to_first()
 
+        index = -1
         for index, v in enumerate(_iter):
 
             if fmt:
@@ -360,7 +361,7 @@ class Table(object):
             if allow_coop and index % 100000 == 0: time.sleep(0)
 
         f.close()
-
+        return index + 1
 
 class RocksDBAPI(object):
     def __init__(self, data_dir):
