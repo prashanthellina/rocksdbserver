@@ -196,6 +196,8 @@ class Table(object):
 
         self.rdb.write(batch)
 
+    # Iteration
+
     def list_keys(self):
         _iter = self.rdb.iterkeys()
         _iter.seek_to_first()
@@ -246,6 +248,38 @@ class Table(object):
     def iter_seek_to_last(self, _iter):
         return _iter.seek_to_last()
 
+    # Backup and restore
+
+    def create_backup(self, path):
+        backup = rocksdb.BackupEngine(path)
+        return backup.create_backup(self.rdb, flush_before_backup=True)
+
+    def stop_backup(self, path):
+        backup = rocksdb.BackupEngine(path)
+        return backup.stop_backup()
+
+    def delete_backup(self, path, backup_id):
+        backup = rocksdb.BackupEngine(path)
+        return backup.delete_backup(backup_id)
+
+    def get_backup_info(self, path):
+        backup = rocksdb.BackupEngine(path)
+        return backup.get_backup_info()
+
+    def restore_backup(self, path, backup_id, db_dir, wal_dir=None):
+        backup = rocksdb.BackupEngine(path)
+        return backup.restore_backup(backup_id, db_dir,
+            wal_dir if wal_dir is not None else db_dir)
+
+    def restore_latest_backup(self, path, db_dir, wal_dir=None):
+        backup = rocksdb.BackupEngine(path)
+        return backup.restore_latest_backup(db_dir,
+            wal_dir if wal_dir is not None else db_dir)
+
+    def purge_old_backups(self, path, num_backups_to_keep):
+        backup = rocksdb.BackupEngine(path)
+        return backup.purge_old_backups(num_backups_to_keep)
+
 class RocksDBAPI(object):
     def __init__(self, data_dir):
         self.data_dir = data_dir
@@ -289,6 +323,8 @@ class RocksDBAPI(object):
         amount of time.
         '''
         return table.delete_all()
+
+    # Iteration API methods
 
     @ensuretable
     def iter_keys(self, table, name=None, prefix=None, reverse=False):
@@ -347,6 +383,36 @@ class RocksDBAPI(object):
         issues for large tables.
         '''
         return table.list_values()
+
+    # Backup API methods
+
+    @ensuretable
+    def create_backup(self, path):
+        return table.create_backup(path)
+
+    @ensuretable
+    def stop_backup(self, path):
+        return table.stop_backup(path)
+
+    @ensuretable
+    def delete_backup(self, path, backup_id):
+        return table.delete_backup(path, backup_id)
+
+    @ensuretable
+    def get_backup_info(self, path):
+        return table.get_backup_info(path)
+
+    @ensuretable
+    def restore_backup(self, path, backup_id, db_dir, wal_dir=None):
+        return table.restore_backup(path, backup_id, db_dir, wal_dir)
+
+    @ensuretable
+    def restore_latest_backup(self, path, db_dir, wal_dir=None):
+        return table.restore_latest_backup(path, db_dir, wal_dir)
+
+    @ensuretable
+    def purge_old_backups(self, path, num_backups_to_keep):
+        return table.purge_old_backups(path, num_backups_to_keep)
 
 class RocksDBServer(RPCServer):
     NAME = 'RocksDBServer'
