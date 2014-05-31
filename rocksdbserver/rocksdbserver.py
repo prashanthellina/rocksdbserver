@@ -387,31 +387,31 @@ class RocksDBAPI(object):
     # Backup API methods
 
     @ensuretable
-    def create_backup(self, path):
+    def create_backup(self, table, path):
         return table.create_backup(path)
 
     @ensuretable
-    def stop_backup(self, path):
+    def stop_backup(self, table, path):
         return table.stop_backup(path)
 
     @ensuretable
-    def delete_backup(self, path, backup_id):
+    def delete_backup(self, table, path, backup_id):
         return table.delete_backup(path, backup_id)
 
     @ensuretable
-    def get_backup_info(self, path):
+    def get_backup_info(self, table, path):
         return table.get_backup_info(path)
 
     @ensuretable
-    def restore_backup(self, path, backup_id, db_dir, wal_dir=None):
+    def restore_backup(self, table, path, backup_id, db_dir, wal_dir=None):
         return table.restore_backup(path, backup_id, db_dir, wal_dir)
 
     @ensuretable
-    def restore_latest_backup(self, path, db_dir, wal_dir=None):
+    def restore_latest_backup(self, table, path, db_dir, wal_dir=None):
         return table.restore_latest_backup(path, db_dir, wal_dir)
 
     @ensuretable
-    def purge_old_backups(self, path, num_backups_to_keep):
+    def purge_old_backups(self, table, path, num_backups_to_keep):
         return table.purge_old_backups(path, num_backups_to_keep)
 
 class RocksDBServer(RPCServer):
