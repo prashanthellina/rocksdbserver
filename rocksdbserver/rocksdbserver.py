@@ -354,7 +354,7 @@ class Table(object):
                 r = self.unpackfn(v)
                 for k, v in r.iteritems():
                     r[k] = AttrDict(v) if isinstance(v, dict) else v
-                    f.write('%s\n' % (fmt % r))
+                f.write('%s\n' % (fmt % r))
             else:
                 f.write(v)
 
