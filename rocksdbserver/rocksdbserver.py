@@ -196,6 +196,12 @@ class Table(object):
 
         self.rdb.write(batch)
 
+    def count(self):
+        _iter = self.rdb.iterkeys()
+        _iter.seek_to_first()
+        for index, k in enumerate(_iter): pass
+        return index + 1
+
     # Iteration
 
     def list_keys(self):
@@ -323,6 +329,13 @@ class RocksDBAPI(object):
         amount of time.
         '''
         return table.delete_all()
+
+    @ensuretable
+    def count(self, table):
+        '''
+        Count the number of records (kv pairs)
+        '''
+        return table.count()
 
     # Iteration API methods
 
