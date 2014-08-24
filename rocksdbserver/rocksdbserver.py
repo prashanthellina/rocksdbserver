@@ -20,6 +20,25 @@ ITERATOR_EXPIRE = 15 * 60 # 15 minutes
 MAX_OPEN_FILES = 500000
 ALPHANUM = string.letters + string.digits
 
+def make_staticprefix(name, size):
+    class StaticPrefix(rocksdb.interfaces.SliceTransform):
+        '''
+        Static prefix extractor implementation for pyrocksdb
+        '''
+        def name(self):
+            return name
+
+        def transform(self, src):
+            return (0, size)
+
+        def in_domain(self, src):
+            return len(src) >= size
+
+        def in_range(self, dst):
+            return len(dst) == size
+
+    return StaticPrefix()
+
 class AttrDict(dict):
     '''
     A dictionary with attribute-style access. It maps attribute access to
