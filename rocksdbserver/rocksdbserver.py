@@ -573,14 +573,18 @@ class RocksDBServer(RPCServer):
 
 class RocksDBClient(RPCClient):
 
-    def _iter(self, table, prefix, reverse, fn):
+    def _iter(self, table, reverse, fn, prefix=None):
         fn = getattr(self, fn)
         name = fn(table, reverse=reverse)
 
-        if reverse:
-            self.iter_seek_to_last(table, name)
+        if prefix is None:
+            if reverse:
+                self.iter_seek_to_last(table, name)
+            else:
+                self.iter_seek_to_first(table, name)
+
         else:
-            self.iter_seek_to_first(table, name)
+            self.iter_seek(table, name, prefix)
 
         while 1:
             items = self.iter_get(table, name)
