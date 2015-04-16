@@ -15,7 +15,7 @@ $ sudo apt-get install libsnappy-dev zlib1g-dev libbz2-dev libgflags-dev
 $ git clone https://github.com/facebook/rocksdb.git
 $ cd rocksdb
 $ # It is tested with this version
-$ git checkout 2.8.fb
+$ git checkout 3.9.fb
 $ make shared_lib
 $ sudo mv librocksdb.so /usr/lib/
 $ sudo mv include/* /usr/include/

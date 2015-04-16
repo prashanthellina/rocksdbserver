@@ -114,13 +114,12 @@ def ensurenewiter(fn, self, *args, **kwargs):
 class Iterator(object):
     NUM_RECORDS = 1000
 
-    def __init__(self, table, prefix=None, type='items', reverse=False):
+    def __init__(self, table, type='items', reverse=False):
         '''
         @type: str; can be items/keys/values
         '''
         self.table = table
         self.type = type
-        self.prefix = prefix
         self.reverse = reverse
         self.ts_last_activity = time.time()
 
@@ -128,7 +127,7 @@ class Iterator(object):
             {'keys': 'iterkeys', 'values': 'itervalues'}\
             .get(type, 'iteritems'))
 
-        self._iter = iterfn(prefix=prefix)
+        self._iter = iterfn()
 
         if reverse:
             self._iter = reversed(self._iter)
@@ -275,21 +274,18 @@ class Table(object):
         return list(self.unpackfn(x) for x in _iter)
 
     @ensurenewiter
-    def iter_keys(self, name=None, prefix=None, reverse=False):
-        self.iters[name] = self.iter_klass(self, prefix,
-            type='keys', reverse=reverse)
+    def iter_keys(self, name=None, reverse=False):
+        self.iters[name] = self.iter_klass(self, type='keys', reverse=reverse)
         return name
 
     @ensurenewiter
-    def iter_values(self, name=None, prefix=None, reverse=False):
-        self.iters[name] = self.iter_klass(self, prefix,
-            type='values', reverse=reverse)
+    def iter_values(self, name=None, reverse=False):
+        self.iters[name] = self.iter_klass(self, type='values', reverse=reverse)
         return name
 
     @ensurenewiter
-    def iter_items(self, name=None, prefix=None, reverse=False):
-        self.iters[name] = self.iter_klass(self, prefix,
-            type='items', reverse=reverse)
+    def iter_items(self, name=None, reverse=False):
+        self.iters[name] = self.iter_klass(self, type='items', reverse=reverse)
         return name
 
     def list_iters(self):
@@ -436,16 +432,16 @@ class RocksDBAPI(object):
     # Iteration API methods
 
     @ensuretable
-    def iter_keys(self, table, name=None, prefix=None, reverse=False):
-        return table.iter_keys(name=name, prefix=prefix, reverse=reverse)
+    def iter_keys(self, table, name=None, reverse=False):
+        return table.iter_keys(name=name, reverse=reverse)
 
     @ensuretable
-    def iter_values(self, table, name=None, prefix=None, reverse=False):
-        return table.iter_values(name=name, prefix=prefix, reverse=reverse)
+    def iter_values(self, table, name=None, reverse=False):
+        return table.iter_values(name=name, reverse=reverse)
 
     @ensuretable
-    def iter_items(self, table, name=None, prefix=None, reverse=False):
-        return table.iter_items(name=name, prefix=prefix, reverse=reverse)
+    def iter_items(self, table, name=None, reverse=False):
+        return table.iter_items(name=name, reverse=reverse)
 
     @ensuretable
     def list_iters(self, table):
@@ -577,9 +573,9 @@ class RocksDBServer(RPCServer):
 
 class RocksDBClient(RPCClient):
 
-    def _iter(self, table, prefix, reverse, fn):
+    def _iter(self, table, reverse, fn, prefix=None):
         fn = getattr(self, fn)
-        name = fn(table, prefix=prefix, reverse=reverse)
+        name = fn(table, reverse=reverse)
 
         if prefix is None:
             if reverse:
@@ -599,14 +595,14 @@ class RocksDBClient(RPCClient):
 
         self.close_iter(table, name)
 
-    def iterkeys(self, table, prefix=None, reverse=False):
-        return self._iter(table, prefix, reverse, 'iter_keys')
+    def iterkeys(self, table, reverse=False):
+        return self._iter(table, reverse, 'iter_keys')
 
-    def itervalues(self, table, prefix=None, reverse=False):
-        return self._iter(table, prefix, reverse, 'iter_values')
+    def itervalues(self, table, reverse=False):
+        return self._iter(table, reverse, 'iter_values')
 
-    def iteritems(self, table, prefix=None, reverse=False):
-        return self._iter(table, prefix, reverse, 'iter_items')
+    def iteritems(self, table, reverse=False):
+        return self._iter(table, reverse, 'iter_items')
 
 if __name__ == '__main__':
     RocksDBServer().start()
